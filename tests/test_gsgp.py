@@ -116,4 +116,4 @@ def test_gsgp_immutability():
                       reconstruct=True, ms_lower=0, ms_upper=1)
 
     predictions = final_tree.predict(X_test)
-    assert float(rmse(y_true=y_test, y_pred=predictions)) == valid_result, "Final result should not change with updates"
+    assert float(rmse(y_true=y_test, y_pred=predictions)[0]) == valid_result, "Final result should not change with updates"

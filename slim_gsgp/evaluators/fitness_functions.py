@@ -25,7 +25,25 @@ This module provides various error metrics functions for evaluating machine lear
 
 import torch
 
+def to_tensor(func):
+    """
+    Decorator to convert the output of a function to a tuple.
+    Parameters
+    ----------
+    func : callable
+        The function to be decorated.
+    Returns
+    -------
+    callable
+        The decorated function that returns a tuple.
+    """
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        return torch.tensor([result])
+    return wrapper
 
+
+@to_tensor
 def rmse(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
     """
     Compute Root Mean Squared Error (RMSE).
@@ -45,6 +63,7 @@ def rmse(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
     return torch.sqrt(torch.mean(torch.square(torch.sub(y_true, y_pred)), dim=len(y_pred.shape) - 1))
 
 
+@to_tensor
 def mse(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
     """
     Compute Mean Squared Error (MSE).
@@ -64,6 +83,7 @@ def mse(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
     return torch.mean(torch.square(torch.sub(y_true, y_pred)), dim=len(y_pred.shape) - 1)
 
 
+@to_tensor
 def mae(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
     """
     Compute Mean Absolute Error (MAE).
@@ -83,6 +103,7 @@ def mae(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
     return torch.mean(torch.abs(torch.sub(y_true, y_pred)), dim=len(y_pred.shape) - 1)
 
 
+@to_tensor
 def mae_int(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
     """
     Compute Mean Absolute Error (MAE) for integer values.
@@ -102,6 +123,7 @@ def mae_int(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
     return torch.mean(torch.abs(torch.sub(y_true, torch.round(y_pred))), dim=len(y_pred.shape) - 1)
 
 
+@to_tensor
 def signed_errors(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
     """
     Compute signed errors between true and predicted values.
@@ -120,6 +142,7 @@ def signed_errors(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
     """
     return torch.sub(y_true, y_pred)
 
+@to_tensor
 def r2_score(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
     """
     Compute R-squared (R²) score.

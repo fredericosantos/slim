@@ -156,9 +156,9 @@ def verbose_reporter(
     ----------
     generation : int
         Current generation number.
-    pop_val_fitness : float
+    pop_val_fitness : float | Tuple
         Population's validation fitness value.
-    pop_test_fitness : float
+    pop_test_fitness : float | Tuple
         Population's test fitness value.
     timing : float
         Time taken for the process.
@@ -172,18 +172,18 @@ def verbose_reporter(
     """
     digits_dataset = len(str(dataset))
     digits_generation = len(str(generation))
-    digits_val_fit = len(str(float(pop_val_fitness)))
+    digits_val_fit = len(str(float(sum(pop_val_fitness))))
     if pop_test_fitness is not None:
-        digits_test_fit = len(str(float(pop_test_fitness)))
+        digits_test_fit = len(str(float(sum(pop_test_fitness))))
         test_text_init = (
                 "|"
                 + " " * 3
-                + str(float(pop_test_fitness))
+                + " | ".join(str(float(fit)) for fit in pop_test_fitness)
                 + " " * (23 - digits_test_fit)
                 + "|"
         )
         test_text = (
-                " " * 3 + str(float(pop_test_fitness)) + " " * (23 - digits_test_fit) + "|"
+                " " * 3 + " | ".join(str(float(fit)) for fit in pop_test_fitness) + " " * (23 - digits_test_fit) + "|"
         )
     else:
         digits_test_fit = 4
@@ -215,7 +215,7 @@ def verbose_reporter(
             + " " * (7 - digits_generation)
             + "|"
             + " " * 3
-            + str(float(pop_val_fitness))
+            + " | ".join(str(float(fit)) for fit in pop_val_fitness)
             + " " * (20 - digits_val_fit)
             + test_text_init
             + " " * 3
@@ -239,7 +239,7 @@ def verbose_reporter(
             + " " * (7 - digits_generation)
             + "|"
             + " " * 3
-            + str(float(pop_val_fitness))
+            + " | ".join(str(float(fit)) for fit in pop_val_fitness)
             + " " * (20 - digits_val_fit)
             + "|"
             + test_text
@@ -296,7 +296,7 @@ def get_best_min(population, n_elites):
         return elites, elites[np.argmin([elite.fitness for elite in elites])]
 
     else:
-        elite = population.population[np.argmin(population.fit)]
+        elite = population.population[np.argmin([fitness[0] for fitness in population.fit])]
         return [elite], elite
 
 
@@ -607,8 +607,8 @@ def validate_inputs(X_train, y_train, X_test, y_test, pop_size, n_iter, elitism,
     if not isinstance(test_elite, bool):
         raise TypeError("test_elite must be a bool")
 
-    if not isinstance(fitness_function, str):
-        raise TypeError("fitness_function must be a str")
+    if not (isinstance(fitness_function, str) or isinstance(fitness_function, list)):
+        raise TypeError("fitness_function must be a str or list")
 
     if not isinstance(initializer, str):
         raise TypeError("initializer must be a str")
@@ -664,31 +664,31 @@ def _evaluate_slim_individual(individual, ffunction, y, testing=False, operator=
         operator = torch.prod
 
     if testing:
-        individual.test_fitness = ffunction(
+        individual.test_fitness = torch.tensor([ff(
             y,
             torch.clamp(
                 operator(individual.test_semantics, dim=0),
                 -1000000000000.0,
                 1000000000000.0,
             ),
-        )
+        ) for ff in ffunction])
 
     else:
-        individual.fitness = ffunction(
+        individual.fitness = torch.tensor([ff(
             y,
             torch.clamp(
                 operator(individual.train_semantics, dim=0),
                 -1000000000000.0,
                 1000000000000.0,
             ),
-        )
+        ) for ff in ffunction])
 
         # if testing is false, return the value so that training parallelization has effect
-        return ffunction(
+        return torch.tensor([ff(
                 y,
                 torch.clamp(
                     operator(individual.train_semantics, dim=0),
                     -1000000000000.0,
                     1000000000000.0,
                 ),
-            )
+            ) for ff in ffunction])

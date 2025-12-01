@@ -19,10 +19,12 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+from slim_gsgp.algorithms.SLIM_GSGP.representations.individual import Individual
 from slim_gsgp.main_slim import slim  # import the slim_gsgp library
 from slim_gsgp.datasets.data_loader import load_ppb  # import the loader for the dataset PPB
 from slim_gsgp.evaluators.fitness_functions import rmse  # import the rmse fitness metric
 from slim_gsgp.utils.utils import train_test_split  # import the train-test split function
+from slim_gsgp.selection.selection_algorithms import nested_tournament_selection, tournament_selection_min
 
 # Load the PPB dataset
 X, y = load_ppb(X_y=True)
@@ -36,8 +38,11 @@ X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, p_test=0.5)
 # Apply the SLIM GSGP algorithm
 final_tree = slim(X_train=X_train, y_train=y_train,
                   X_test=X_val, y_test=y_val,
-                  dataset_name='ppb', slim_version='SLIM+SIG2', pop_size=100, n_iter=100,
-                  ms_lower=0, ms_upper=1, p_inflate=0.5, reconstruct=True)
+                  dataset_name='ppb', slim_version='SLIM*SIG2', pop_size=100, n_iter=100,
+                  selector=nested_tournament_selection(pool1=5, pool2=2, maximize1=False, maximize2=True),
+                  fitness_function=['rmse', 'r2'],
+                  # selector = tournament_selection_min(pool_size=4),
+                  ms_lower=0, ms_upper=1, p_inflate=0.5, reconstruct=True, elitism=True, n_elites=1,)
 
 # Show the best individual structure at the last generation
 final_tree.print_tree_representation()
@@ -46,4 +51,4 @@ final_tree.print_tree_representation()
 predictions = final_tree.predict(X_test)
 
 # Compute and print the RMSE on the test set
-print(float(rmse(y_true=y_test, y_pred=predictions)))
+print(float(rmse(y_true=y_test, y_pred=predictions)[0]))

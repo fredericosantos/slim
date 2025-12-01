@@ -115,7 +115,7 @@ def test_gp_immutability():
     predictions = final_tree.predict(X_test)
 
     # Compute and print the RMSE on the test set
-    assert float(rmse(y_true=y_test, y_pred=predictions)) == valid_result, "Final result should not change with updates"
+    assert float(rmse(y_true=y_test, y_pred=predictions)[0]) == valid_result, "Final result should not change with updates"
 
 def test_gp_no_max_depth():
     result = gp(valid_X_train, valid_y_train, max_depth=None, n_iter=3, pop_size=5)

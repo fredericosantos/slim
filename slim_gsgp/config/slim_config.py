@@ -23,7 +23,7 @@ import torch
 from slim_gsgp.initializers.initializers import rhh, grow, full
 from slim_gsgp.algorithms.GSGP.operators.crossover_operators import geometric_crossover
 from slim_gsgp.algorithms.SLIM_GSGP.operators.mutators import (deflate_mutation)
-from slim_gsgp.selection.selection_algorithms import tournament_selection_min
+from slim_gsgp.selection.selection_algorithms import tournament_selection_min, nested_tournament_selection
 from slim_gsgp.evaluators.fitness_functions import *
 from slim_gsgp.utils.utils import (get_best_min, protected_div)
 
@@ -65,7 +65,8 @@ slim_gsgp_solve_parameters = {
 # SLIM GSGP parameters
 slim_gsgp_parameters = {
     "initializer": "rhh",
-    "selector": tournament_selection_min(2),
+    # "selector": nested_tournament_selection(pool_size=(2, ), n_tournaments=1 , maximize=(False, )),
+    "selector": tournament_selection_min(pool_size=2),
     "crossover": geometric_crossover,
     "ms": None,
     "inflate_mutator": None,

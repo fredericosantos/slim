@@ -22,11 +22,13 @@
 from slim_gsgp.main_gp import gp  # import the slim_gsgp library
 import pytest
 import torch
+import numpy as np
 import os
 from slim_gsgp.main_slim import slim  # import the slim_gsgp library
 from slim_gsgp.datasets.data_loader import load_ppb  # import the loader for the dataset PPB
 from slim_gsgp.evaluators.fitness_functions import rmse  # import the rmse fitness metric
 from slim_gsgp.utils.utils import train_test_split  # import the train-test split function
+from slim_gsgp.selection.selection_algorithms import nested_tournament_selection, tournament_selection_min
 
 # NOTE: The number of generations is lowered in most tests to prevent unnecessary running times when testing.
 
@@ -113,8 +115,8 @@ def test_slim_immutability():
                       ms_lower=0, ms_upper=1, p_inflate=0.5, reconstruct=True, init_depth=8, copy_parent=None)
 
     predictions = final_tree.predict(X_test)
-    print(float(rmse(y_true=y_test, y_pred=predictions)))
-    assert float(rmse(y_true=y_test, y_pred=predictions)) == valid_result, "Final result should not change with updates"
+    # print(float(rmse(y_true=y_test, y_pred=predictions)[0]))
+    assert float(rmse(y_true=y_test, y_pred=predictions)[0]) == valid_result, "Final result should not change with updates"
 
 
 def test_slim_saving_and_loading(tmp_path):
@@ -130,3 +132,5 @@ def test_slim_saving_and_loading(tmp_path):
     # Assert predictions are the same
     assert torch.equal(result_tree.predict(valid_X_test), loaded_tree.predict(valid_X_test)), \
         "Loaded tree should produce the same predictions as the original"
+
+

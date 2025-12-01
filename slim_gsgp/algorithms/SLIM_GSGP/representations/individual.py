@@ -197,24 +197,24 @@ class Individual:
 
         # computing the testing fitness, if applicable
         if testing:
-            self.test_fitness = ffunction(
+            self.test_fitness = torch.tensor([ff(
                 y,
                 torch.clamp(
                     operator(self.test_semantics, dim=0),
                     -1000000000000.0,
                     1000000000000.0,
                 ),
-            )
+            ) for ff in ffunction])
         # computing the training fitness
         else:
-            self.fitness = ffunction(
+            self.fitness = torch.tensor([ff(
                 y,
                 torch.clamp(
                     operator(self.train_semantics, dim=0),
                     -1000000000000.0,
                     1000000000000.0,
                 ),
-            )
+            ) for ff in ffunction])
 
     def predict(self, data):
         """
