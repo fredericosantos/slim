@@ -129,7 +129,7 @@ def log_final_metrics(
             elite.calculate_semantics(X_test, testing=True)
         
         if scaler is not None:
-            test_fitness = _evaluate_slim_individual(
+            _evaluate_slim_individual(
                 elite,
                 lambda y_true, y_pred: ffunction(y_true, y_pred, scaler),
                 y_test,
@@ -137,7 +137,7 @@ def log_final_metrics(
                 operator=operator
             )
         else:
-            test_fitness = _evaluate_slim_individual(
+            _evaluate_slim_individual(
                 elite,
                 ffunction,
                 y_test,
@@ -145,7 +145,7 @@ def log_final_metrics(
                 operator=operator
             )
         
-        mlflow.log_metric("best_test_fitness", float(test_fitness))
+        mlflow.log_metric("best_test_fitness", float(elite.test_fitness))
 
 
 def end_mlflow_run() -> None:
