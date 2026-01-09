@@ -81,6 +81,7 @@ def slim(
     tournament_size: int = 2,
     test_elite: bool = slim_gsgp_solve_parameters["test_elite"],
     scaler = None,
+    **kwargs
 ):
     """
     Main function to execute the SLIM GSGP algorithm on specified datasets.

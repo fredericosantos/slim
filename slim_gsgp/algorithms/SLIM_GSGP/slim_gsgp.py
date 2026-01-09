@@ -57,6 +57,7 @@ class SLIM_GSGP:
         copy_parent=True,
         two_trees=True,
         settings_dict=None,
+        **kwargs
     ):
         """
         Initialize the SLIM_GSGP algorithm with given parameters.
@@ -135,7 +136,6 @@ class SLIM_GSGP:
         y_train,
         y_test,
         curr_dataset,
-        run_info,
         n_iter=20,
         elitism=True,
         test_elite=False,
@@ -159,8 +159,6 @@ class SLIM_GSGP:
             Testing output data.
         curr_dataset : str or int
             Identifier for the current dataset.
-        run_info : dict
-            Information about the current run.
         n_iter : int
             Number of iterations. Default is 20.
         elitism : bool
