@@ -74,7 +74,7 @@ def slim(
     minimization: bool = True,
     prob_const: float = slim_gsgp_pi_init["p_c"],
     tree_functions: list = list(FUNCTIONS.keys()),
-    tree_constants: list | callable = generate_linspace_constants(),
+    tree_constants = generate_linspace_constants(start=-1, end=1),
     copy_parent: bool = slim_gsgp_parameters["copy_parent"],
     max_depth: int | None = slim_gsgp_solve_parameters["max_depth"],
     n_jobs: int = slim_gsgp_solve_parameters["n_jobs"],
@@ -127,9 +127,6 @@ def slim(
         The probability of a constant being chosen rather than a terminal in trees creation (default: 0.2).
     tree_functions : list, optional
         List of allowed functions that can appear in the trees. Check documentation for the available functions.
-    tree_constants : list | callable, optional
-        Either a list of numeric constants or a callable returning a dict of constants with lambda functions.
-        Default generates 20 linearly spaced values between -1 and 1.
     max_depth: int, optional
         Max depth for the SLIM GSGP trees.
     copy_parent: bool, optional
