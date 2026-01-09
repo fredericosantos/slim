@@ -33,6 +33,7 @@ from slim_gsgp.config.gsgp_config import *
 from slim_gsgp.utils.mlflow_logger import init_mlflow_run, log_final_metrics, end_mlflow_run
 from slim_gsgp.utils.utils import get_terminals, validate_inputs, generate_random_uniform
 from typing import Callable
+from slim_gsgp.utils.utils import generate_linspace_constants
 
 def gsgp(X_train: torch.Tensor, y_train: torch.Tensor, X_test: torch.Tensor = None, y_test: torch.Tensor = None,
          dataset_name: str = None,
@@ -53,7 +54,7 @@ def gsgp(X_train: torch.Tensor, y_train: torch.Tensor, X_test: torch.Tensor = No
          minimization: bool = True,
          prob_const: float = gsgp_pi_init["p_c"],
          tree_functions: list = list(FUNCTIONS.keys()),
-         tree_constants: list | callable = generate_linspace_constants(),
+         tree_constants = generate_linspace_constants(),
          n_jobs: int = gsgp_solve_parameters["n_jobs"],
          tournament_size: int = 2,
          test_elite: bool = gsgp_solve_parameters["test_elite"]):
@@ -108,7 +109,7 @@ def gsgp(X_train: torch.Tensor, y_train: torch.Tensor, X_test: torch.Tensor = No
         The probability of a constant being chosen rather than a terminal in trees creation (default: 0.2).
     tree_functions : list, optional
         List of allowed functions that can appear in the trees. Check documentation for the available functions.
-    tree_constants : list | callable, optional
+    tree_constants
         Either a list of numeric constants or a callable returning a dict of constants with lambda functions.
         Default generates 20 linearly spaced values between -1 and 1.
     tournament_size : int, optional
