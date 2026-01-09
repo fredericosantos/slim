@@ -32,9 +32,7 @@ from slim_gsgp.algorithms.GP.representations.tree import Tree as GP_Tree
 from slim_gsgp.algorithms.GSGP.representations.tree import Tree
 from slim_gsgp.algorithms.SLIM_GSGP.representations.individual import Individual
 from slim_gsgp.algorithms.SLIM_GSGP.representations.population import Population
-from slim_gsgp.utils.diversity import gsgp_pop_div_from_vectors
-from slim_gsgp.utils.logger import logger
-from slim_gsgp.utils.utils import verbose_reporter
+from slim_gsgp.utils.mlflow_logger import log_generation
 
 
 class SLIM_GSGP:
@@ -140,10 +138,7 @@ class SLIM_GSGP:
         run_info,
         n_iter=20,
         elitism=True,
-        log=0,
-        verbose=0,
         test_elite=False,
-        log_path=None,
         ffunction=None,
         max_depth=17,
         n_elites=1,
@@ -170,16 +165,10 @@ class SLIM_GSGP:
             Number of iterations. Default is 20.
         elitism : bool
             Whether elitism is used during evolution. Default is True.
-        log : int or str
-            Logging level (e.g., 0 for no logging, 1 for basic, etc.). Default is 0.
-        verbose : int
-            Verbosity level for logging outputs. Default is 0.
         test_elite : bool
             Whether elite individuals should be tested. Default is False.
-        log_path : str
-            File path for saving log outputs. Default is None.
-        ffunction : function
-            Fitness function used to evaluate individuals. Default is None.
+        ffunction : str
+            Fitness function name used to evaluate individuals. Default is None.
         max_depth : int
             Maximum depth for the trees. Default is 17.
         n_elites : int
@@ -240,100 +229,14 @@ class SLIM_GSGP:
                 ffunction, y=y_test, testing=True, operator=self.operator
             )
 
-        # logging the results based on the log level
-        if log != 0:
-            if log == 2:
-                gen_diversity = (
-                    gsgp_pop_div_from_vectors(
-                        torch.stack(
-                            [
-                                torch.sum(ind.train_semantics, dim=0)
-                                for ind in population.population
-                            ]
-                        ),
-                    )
-                    if self.operator == "sum"
-                    else gsgp_pop_div_from_vectors(
-                        torch.stack(
-                            [
-                                torch.prod(ind.train_semantics, dim=0)
-                                for ind in population.population
-                            ]
-                        )
-                    )
-                )
-                add_info = [
-                    self.elite.test_fitness,
-                    self.elite.nodes_count,
-                    float(gen_diversity),
-                    np.std(population.fit),
-                    log,
-                ]
-
-            elif log == 3:
-                add_info = [
-                    self.elite.test_fitness,
-                    self.elite.nodes_count,
-                    " ".join([str(ind.nodes_count) for ind in population.population]),
-                    " ".join([str(f) for f in population.fit]),
-                    log,
-                ]
-
-            elif log == 4:
-                gen_diversity = (
-                    gsgp_pop_div_from_vectors(
-                        torch.stack(
-                            [
-                                torch.sum(ind.train_semantics, dim=0)
-                                for ind in population.population
-                            ]
-                        ),
-                    )
-                    if self.operator == "sum"
-                    else gsgp_pop_div_from_vectors(
-                        torch.stack(
-                            [
-                                torch.prod(ind.train_semantics, dim=0)
-                                for ind in population.population
-                            ]
-                        )
-                    )
-                )
-                add_info = [
-                    self.elite.test_fitness,
-                    self.elite.nodes_count,
-                    float(gen_diversity),
-                    np.std(population.fit),
-                    " ".join([str(ind.nodes_count) for ind in population.population]),
-                    " ".join([str(f) for f in population.fit]),
-                    log,
-                ]
-
-            else:
-
-                add_info = [self.elite.test_fitness, self.elite.nodes_count, log]
-
-            logger(
-                log_path,
-                0,
-                self.elite.fitness,
-                end - start,
-                float(population.nodes_count),
-                additional_infos=add_info,
-                run_info=run_info,
-                seed=self.seed,
-            )
-
-        # displaying the results on console if verbose level is more than 0
-        if verbose != 0:
-            verbose_reporter(
-                curr_dataset,
-                0,
-                self.elite.fitness,
-                self.elite.test_fitness,
-                end - start,
-                self.elite.nodes_count,
-            )
+        # Log generation 0 metrics to MLflow
+        log_generation(
+            generation=0,
+            best_train_fitness=float(self.elite.fitness),
+            best_test_fitness=float(self.elite.test_fitness) if test_elite else None,
+            best_n_nodes=self.elite.nodes_count,
+            fitness_function=ffunction
+        )
 
         # begining the evolution process
         for it in range(1, n_iter + 1, 1):
@@ -511,101 +414,14 @@ class SLIM_GSGP:
                     ffunction, y=y_test, testing=True, operator=self.operator
                 )
 
-            # logging the results based on the log level
-            if log != 0:
+            # Log generation metrics to MLflow
+            log_generation(
+                generation=it,
+                best_train_fitness=float(self.elite.fitness),
+                best_test_fitness=float(self.elite.test_fitness) if test_elite else None,
+                best_n_nodes=self.elite.nodes_count,
+                fitness_function=ffunction
+            )
+    
+        return self.elite
 
-                if log == 2:
-                    gen_diversity = (
-                        gsgp_pop_div_from_vectors(
-                            torch.stack(
-                                [
-                                    torch.sum(ind.train_semantics, dim=0)
-                                    for ind in population.population
-                                ]
-                            ),
-                        )
-                        if self.operator == "sum"
-                        else gsgp_pop_div_from_vectors(
-                            torch.stack(
-                                [
-                                    torch.prod(ind.train_semantics, dim=0)
-                                    for ind in population.population
-                                ]
-                            )
-                        )
-                    )
-                    add_info = [
-                        self.elite.test_fitness,
-                        self.elite.nodes_count,
-                        float(gen_diversity),
-                        np.std(population.fit),
-                        log,
-                    ]
-
-                elif log == 3:
-                    add_info = [
-                        self.elite.test_fitness,
-                        self.elite.nodes_count,
-                        " ".join(
-                            [str(ind.nodes_count) for ind in population.population]
-                        ),
-                        " ".join([str(f) for f in population.fit]),
-                        log,
-                    ]
-
-                elif log == 4:
-                    gen_diversity = (
-                        gsgp_pop_div_from_vectors(
-                            torch.stack(
-                                [
-                                    torch.sum(ind.train_semantics, dim=0)
-                                    for ind in population.population
-                                ]
-                            ),
-                        )
-                        if self.operator == "sum"
-                        else gsgp_pop_div_from_vectors(
-                            torch.stack(
-                                [
-                                    torch.prod(ind.train_semantics, dim=0)
-                                    for ind in population.population
-                                ]
-                            )
-                        )
-                    )
-                    add_info = [
-                        self.elite.test_fitness,
-                        self.elite.nodes_count,
-                        float(gen_diversity),
-                        np.std(population.fit),
-                        " ".join(
-                            [str(ind.nodes_count) for ind in population.population]
-                        ),
-                        " ".join([str(f) for f in population.fit]),
-                        log,
-                    ]
-
-                else:
-                    add_info = [self.elite.test_fitness, self.elite.nodes_count, log]
-
-                logger(
-                    log_path,
-                    it,
-                    self.elite.fitness,
-                    end - start,
-                    float(population.nodes_count),
-                    additional_infos=add_info,
-                    run_info=run_info,
-                    seed=self.seed,
-                )
-
-            # displaying the results on console if verbose level is more than 0
-            if verbose != 0:
-                verbose_reporter(
-                    run_info[-1],
-                    it,
-                    self.elite.fitness,
-                    self.elite.test_fitness,
-                    end - start,
-                    self.elite.nodes_count,
-                )

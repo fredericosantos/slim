@@ -51,10 +51,9 @@ settings_dict = {"p_test": 0.2}
 
 # GP solve parameters
 gp_solve_parameters = {
-    "log": 1,
-    "verbose": 1,
+    "mlflow_tracking_uri": "./mlruns",
+    "experiment_name": "GP_Experiments",
     "test_elite": True,
-    "run_info": None,
     "ffunction": "rmse",
     "n_jobs": 1,
     "max_depth": 17,

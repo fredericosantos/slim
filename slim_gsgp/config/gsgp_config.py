@@ -52,14 +52,13 @@ settings_dict = {"p_test": 0.2}
 
 # GSGP solve parameters
 gsgp_solve_parameters = {
-    "run_info": None,
+    "mlflow_tracking_uri": "./mlruns",
+    "experiment_name": "GSGP_Experiments",
     "reconstruct": False,
     "n_jobs": 1,
     "n_iter": 1000,
     "elitism": True,
     "n_elites": 1,
-    "log": 1,
-    "verbose": 1,
     "ffunction": "rmse",
     "test_elite": True
 }

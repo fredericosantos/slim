@@ -492,8 +492,8 @@ def gs_size(y_true, y_pred):
     return y_pred[1]
 
 
-def validate_inputs(X_train, y_train, X_test, y_test, pop_size, n_iter, elitism, n_elites, init_depth, log_path,
-                    prob_const, tree_functions, tree_constants, log, verbose, minimization, n_jobs, test_elite,
+def validate_inputs(X_train, y_train, X_test, y_test, pop_size, n_iter, elitism, n_elites, init_depth,
+                    prob_const, tree_functions, tree_constants, minimization, n_jobs, test_elite,
                     fitness_function, initializer, tournament_size):
     """
     Validates the inputs based on the specified conditions.
@@ -519,12 +519,6 @@ def validate_inputs(X_train, y_train, X_test, y_test, pop_size, n_iter, elitism,
         The number of elites.
     init_depth : int, optional
         The depth value for the initial GP trees population.
-    log_path : str, optional
-        The path where is created the log directory where results are saved.
-    log : int, optional
-        Level of detail to utilize in logging.
-    verbose : int, optional
-       Level of detail to include in console output.
     minimization : bool, optional
         If True, the objective is to minimize the fitness function. If False, maximize it (default is True).
     fitness_function : str, optional
@@ -561,8 +555,6 @@ def validate_inputs(X_train, y_train, X_test, y_test, pop_size, n_iter, elitism,
         raise TypeError("n_elites must be an int")
     if not isinstance(init_depth, int):
         raise TypeError("init_depth must be an int")
-    if not isinstance(log_path, str):
-        raise TypeError("log_path must be a str")
     if not isinstance(tournament_size, int):
         raise TypeError("tournament_size must be an int")
 
@@ -580,21 +572,16 @@ def validate_inputs(X_train, y_train, X_test, y_test, pop_size, n_iter, elitism,
     if not isinstance(tree_functions, list) or len(tree_functions) == 0:
         raise TypeError("tree_functions must be a non-empty list")
 
-    if not isinstance(tree_constants, list) or len(tree_constants) == 0:
-        raise TypeError("tree_constants must be a non-empty list")
-
-    assert all(isinstance(elem, (int, float)) and not isinstance(elem, bool) for elem in tree_constants), \
-    "tree_constants must be a list containing only integers and floats"
-
-    if not isinstance(log, int):
-        raise TypeError("log_level must be an int")
-
-    assert 0 <= log <= 4, "log_level must be between 0 and 4"
-
-    if not isinstance(verbose, int):
-        raise TypeError("verbose level must be an int")
-
-    assert 0 <= verbose <= 1, "verbose level must be either 0 or 1"
+    # tree_constants can be either a list or a callable
+    if callable(tree_constants):
+        # Accept callable - trust user that it returns proper dict
+        pass
+    elif isinstance(tree_constants, list) and len(tree_constants) > 0:
+        # Validate list elements
+        assert all(isinstance(elem, (int, float)) and not isinstance(elem, bool) for elem in tree_constants), \
+        "tree_constants must be a list containing only integers and floats"
+    else:
+        raise TypeError("tree_constants must be a non-empty list or a callable")
 
     if not isinstance(minimization, bool):
         raise TypeError("minimization must be a bool")
@@ -615,6 +602,41 @@ def validate_inputs(X_train, y_train, X_test, y_test, pop_size, n_iter, elitism,
 
     if tournament_size < 2:
         raise ValueError("tournament_size must be at least 2")
+
+
+def generate_linspace_constants(n: int = 20, start: float = -1.0, end: float = 1.0):
+    """
+    Generate a callable that returns a dictionary of constants with linearly spaced values.
+    
+    Parameters
+    ----------
+    n : int, optional
+        Number of constants to generate (default is 20).
+    start : float, optional
+        Start value for linspace (default is -1.0).
+    end : float, optional
+        End value for linspace (default is 1.0).
+    
+    Returns
+    -------
+    callable
+        A callable that returns a dictionary of constants with lambda functions returning torch tensors.
+    
+    Examples
+    --------
+    >>> constants_gen = generate_linspace_constants(n=5, start=-1, end=1)
+    >>> constants_dict = constants_gen()
+    >>> list(constants_dict.keys())
+    ['constant__1', 'constant__05', 'constant_0', 'constant_05', 'constant_1']
+    """
+    def constants_callable():
+        import numpy as np
+        values = np.linspace(start, end, n)
+        return {
+            f"constant_{str(float(v)).replace('-', '_').replace('.', '')}": lambda _, val=v: torch.tensor(float(val))
+            for v in values
+        }
+    return constants_callable
 
 
 def check_slim_version(slim_version):

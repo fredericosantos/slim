@@ -49,15 +49,12 @@ settings_dict = {"p_test": 0.2}
 
 # SLIM GSGP solve parameters
 slim_gsgp_solve_parameters = {
-    "run_info": None,
     "ffunction": "rmse",
     "max_depth": 15,
     "reconstruct": True,
     "n_iter": 1000,
     "elitism": True,
     "n_elites": 1,
-    "log": 1,
-    "verbose": 1,
     "n_jobs": 1,
     "test_elite": True
 }

@@ -142,3 +142,42 @@ def r2_score(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
     ss_tot = torch.sum(torch.square(y_true - torch.mean(y_true)))
     r2 = 1 - (ss_res / ss_tot)
     return r2
+
+
+def rmse_with_scaler(y_true: torch.Tensor, y_pred: torch.Tensor, scaler) -> torch.Tensor:
+    """
+    Compute Root Mean Squared Error (RMSE) after unscaling predictions.
+    
+    This function unscales both y_true and y_pred using the provided scaler
+    before computing RMSE. The scaler is expected to be a scikit-learn scaler
+    (e.g., StandardScaler, MinMaxScaler) with inverse_transform method.
+    
+    Parameters
+    ----------
+    y_true : torch.Tensor
+        True values (scaled).
+    y_pred : torch.Tensor
+        Predicted values (scaled).
+    scaler : sklearn scaler object
+        Scaler with inverse_transform method to unscale the data.
+    
+    Returns
+    -------
+    torch.Tensor
+        RMSE value computed on unscaled data.
+    """
+    import numpy as np
+    
+    # Convert to numpy, reshape for scaler, and unscale
+    y_true_np = y_true.detach().cpu().numpy().reshape(-1, 1)
+    y_pred_np = y_pred.detach().cpu().numpy().reshape(-1, 1)
+    
+    y_true_unscaled = scaler.inverse_transform(y_true_np).flatten()
+    y_pred_unscaled = scaler.inverse_transform(y_pred_np).flatten()
+    
+    # Convert back to torch tensors
+    y_true_torch = torch.from_numpy(y_true_unscaled)
+    y_pred_torch = torch.from_numpy(y_pred_unscaled)
+    
+    # Compute RMSE on unscaled data
+    return torch.sqrt(torch.mean(torch.square(torch.sub(y_true_torch, y_pred_torch))))

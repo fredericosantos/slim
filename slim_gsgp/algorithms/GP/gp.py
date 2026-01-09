@@ -30,9 +30,7 @@ import numpy as np
 import torch
 from slim_gsgp.algorithms.GP.representations.population import Population
 from slim_gsgp.algorithms.GP.representations.tree import Tree
-from slim_gsgp.utils.diversity import niche_entropy
-from slim_gsgp.utils.logger import logger
-from slim_gsgp.utils.utils import verbose_reporter
+from slim_gsgp.utils.mlflow_logger import log_generation
 
 
 class GP:
@@ -103,11 +101,7 @@ class GP:
         curr_dataset,
         n_iter=20,
         elitism=True,
-        log=0,
-        verbose=0,
         test_elite=False,
-        log_path=None,
-        run_info=None,
         max_depth=None,
         ffunction=None,
         n_elites=1,
@@ -133,20 +127,12 @@ class GP:
             Number of iterations. Default is 20.
         elitism : bool, optional
             Whether to use elitism. Default is True.
-        log : int, optional
-            Logging level. Default is 0.
-        verbose : int, optional
-            Verbosity level. Default is 0.
         test_elite : bool, optional
             Whether to evaluate elite individuals on test data. Default is False.
-        log_path : str, optional
-            Path to save logs. Default is None.
-        run_info : list, optional
-            Information about the current run. Default is None.
         max_depth : int, optional
             Maximum depth of the tree. Default is None.
-        ffunction : function, optional
-            Fitness function. Default is None.
+        ffunction : str, optional
+            Fitness function name. Default is None.
         n_elites : int, optional
             Number of elites. Default is 1.
         depth_calculator : function, optional
@@ -178,23 +164,14 @@ class GP:
         if test_elite:
             self.elite.evaluate(ffunction, X=X_test, y=y_test, testing=True)
 
-        # logging the results if the log level is not 0
-
-        if log != 0:
-            self.log_generation(
-                    0, population, end - start, log, log_path, run_info
-                )
-
-        # displaying the results on console if verbose level is not 0
-        if verbose != 0:
-            verbose_reporter(
-                curr_dataset.split("load_")[-1],
-                0,
-                self.elite.fitness,
-                self.elite.test_fitness,
-                end - start,
-                self.elite.node_count,
-            )
+        # Log generation 0 metrics to MLflow
+        log_generation(
+            generation=0,
+            best_train_fitness=float(self.elite.fitness),
+            best_test_fitness=float(self.elite.test_fitness) if test_elite else None,
+            best_n_nodes=self.elite.node_count,
+            fitness_function=ffunction
+        )
 
         # EVOLUTIONARY PROCESS
         for it in range(1, n_iter + 1):
@@ -221,22 +198,14 @@ class GP:
             if test_elite:
                 self.elite.evaluate(ffunction, X=X_test, y=y_test, testing=True)
 
-            # logging the results if log != 0
-            if log != 0:
-                self.log_generation(
-                    it, population, end - start, log, log_path, run_info
-                )
-
-            # displaying the results on console if verbose != 0
-            if verbose != 0:
-                verbose_reporter(
-                    run_info[-1],
-                    it,
-                    self.elite.fitness,
-                    self.elite.test_fitness,
-                    end - start,
-                    self.elite.node_count,
-                )
+            # Log generation metrics to MLflow
+            log_generation(
+                generation=it,
+                best_train_fitness=float(self.elite.fitness),
+                best_test_fitness=float(self.elite.test_fitness) if test_elite else None,
+                best_n_nodes=self.elite.node_count,
+                fitness_function=ffunction
+            )
 
     def evolve_population(
         self,
@@ -362,60 +331,3 @@ class GP:
 
         # retuning the offspring population and the time control variable
         return offs_pop, start
-
-    def log_generation(
-        self, generation, population, elapsed_time, log, log_path, run_info
-    ):
-        """
-        Log the results for the current generation.
-
-        Args:
-            generation (int): Current generation (iteration) number.
-            population (Population): Current population.
-            elapsed_time (float): Time taken for the process.
-            log (int): Logging level.
-            log_path (str): Path to save logs.
-            run_info (list): Information about the current run.
-
-        Returns:
-            None
-        """
-        if log == 2:
-            add_info = [
-                self.elite.test_fitness,
-                self.elite.node_count,
-                float(niche_entropy([ind.repr_ for ind in population.population])),
-                np.std(population.fit),
-                log,
-            ]
-        elif log == 3:
-            add_info = [
-                self.elite.test_fitness,
-                self.elite.node_count,
-                " ".join([str(ind.node_count) for ind in population.population]),
-                " ".join([str(f) for f in population.fit]),
-                log,
-            ]
-        elif log == 4:
-            add_info = [
-                self.elite.test_fitness,
-                self.elite.node_count,
-                float(niche_entropy([ind.repr_ for ind in population.population])),
-                np.std(population.fit),
-                " ".join([str(ind.node_count) for ind in population.population]),
-                " ".join([str(f) for f in population.fit]),
-                log,
-            ]
-        else:
-            add_info = [self.elite.test_fitness, self.elite.node_count, log]
-
-        logger(
-            log_path,
-            generation,
-            self.elite.fitness,
-            elapsed_time,
-            float(population.nodes_count),
-            additional_infos=add_info,
-            run_info=run_info,
-            seed=self.seed,
-        )

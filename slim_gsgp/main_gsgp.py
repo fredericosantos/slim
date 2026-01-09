@@ -30,7 +30,7 @@ import warnings
 
 from slim_gsgp.algorithms.GSGP.gsgp import GSGP
 from slim_gsgp.config.gsgp_config import *
-from slim_gsgp.utils.logger import log_settings
+from slim_gsgp.utils.mlflow_logger import init_mlflow_run, log_final_metrics, end_mlflow_run
 from slim_gsgp.utils.utils import get_terminals, validate_inputs, generate_random_uniform
 from typing import Callable
 
@@ -44,17 +44,16 @@ def gsgp(X_train: torch.Tensor, y_train: torch.Tensor, X_test: torch.Tensor = No
          init_depth: int = gsgp_pi_init["init_depth"],
          ms_lower: float = 0,
          ms_upper: float = 1,
-         log_path: str = None,
          seed: int = gsgp_parameters["seed"],
-         log_level: int = gsgp_solve_parameters["log"],
-         verbose: int = gsgp_solve_parameters["verbose"],
+         mlflow_tracking_uri: str = gsgp_solve_parameters["mlflow_tracking_uri"],
+         experiment_name: str = gsgp_solve_parameters["experiment_name"],
          reconstruct: bool = gsgp_solve_parameters["reconstruct"],
          fitness_function: str = gsgp_solve_parameters["ffunction"],
          initializer: str = gsgp_parameters["initializer"],
          minimization: bool = True,
          prob_const: float = gsgp_pi_init["p_c"],
          tree_functions: list = list(FUNCTIONS.keys()),
-         tree_constants: list = [float(key.replace("constant_", "").replace("_", "-")) for key in CONSTANTS],
+         tree_constants: list | callable = generate_linspace_constants(),
          n_jobs: int = gsgp_solve_parameters["n_jobs"],
          tournament_size: int = 2,
          test_elite: bool = gsgp_solve_parameters["test_elite"]):
@@ -89,14 +88,12 @@ def gsgp(X_train: torch.Tensor, y_train: torch.Tensor, X_test: torch.Tensor = No
         Lower bound for mutation rates (default is 0).
     ms_upper : float, optional
         Upper bound for mutation rates (default is 1).
-    log_path : str, optional
-        The path where is created the log directory where results are saved.
     seed : int, optional
         Seed for the randomness
-    log_level : int, optional
-        Level of detail to utilize in logging.
-    verbose : int, optional
-       Level of detail to include in console output.
+    mlflow_tracking_uri : str, optional
+        MLflow tracking URI for logging experiments (default from config).
+    experiment_name : str, optional
+        Name of the MLflow experiment (default from config).
     reconstruct: bool, optional
         Whether to store the structure of individuals. More computationally expensive, but allows usage outside the algorithm.
     minimization : bool, optional
@@ -111,8 +108,9 @@ def gsgp(X_train: torch.Tensor, y_train: torch.Tensor, X_test: torch.Tensor = No
         The probability of a constant being chosen rather than a terminal in trees creation (default: 0.2).
     tree_functions : list, optional
         List of allowed functions that can appear in the trees. Check documentation for the available functions.
-    tree_constants : list, optional
-        List of constants allowed to appear in the trees.
+    tree_constants : list | callable, optional
+        Either a list of numeric constants or a callable returning a dict of constants with lambda functions.
+        Default generates 20 linearly spaced values between -1 and 1.
     tournament_size : int, optional
         Tournament size to utilize during selection. Only applicable if using tournament selection. (Default is 2)
     test_elite : bool, optional
@@ -127,13 +125,9 @@ def gsgp(X_train: torch.Tensor, y_train: torch.Tensor, X_test: torch.Tensor = No
     #         Input Validation
     # ================================
 
-    # Setting the log_path
-    if log_path is None:
-        log_path = os.path.join(os.getcwd(), "log", "gsgp.csv")
-
     validate_inputs(X_train=X_train, y_train=y_train, X_test=X_test, y_test=y_test, pop_size=pop_size, n_iter=n_iter,
-                    elitism=elitism, n_elites=n_elites, init_depth=init_depth, log_path=log_path, prob_const=prob_const,
-                    tree_functions=tree_functions, tree_constants=tree_constants, log=log_level, verbose=verbose,
+                    elitism=elitism, n_elites=n_elites, init_depth=init_depth, prob_const=prob_const,
+                    tree_functions=tree_functions, tree_constants=tree_constants,
                     minimization=minimization, n_jobs=n_jobs, test_elite=test_elite, fitness_function=fitness_function,
                     initializer=initializer, tournament_size=tournament_size)
 
@@ -200,14 +194,20 @@ def gsgp(X_train: torch.Tensor, y_train: torch.Tensor, X_test: torch.Tensor = No
             if len(valid_functions) > 1 else valid_functions[0])
 
 
-    try:
-        gsgp_pi_init['CONSTANTS'] = {f"constant_{str(n).replace('-', '_')}": lambda _, num=n: torch.tensor(num)
-                                     for n in tree_constants}
-    except KeyError as e:
-        valid_constants = list(CONSTANTS)
-        raise KeyError(
-            "The available tree constants are: " + f"{', '.join(valid_constants[:-1])} or "f"{valid_constants[-1]}"
-            if len(valid_constants) > 1 else valid_constants[0])
+    # Handle tree_constants - either callable or list
+    if callable(tree_constants):
+        # User provided a callable - invoke it to get the dictionary
+        gsgp_pi_init['CONSTANTS'] = tree_constants()
+    else:
+        # User provided a list - convert as before
+        try:
+            gsgp_pi_init['CONSTANTS'] = {f"constant_{str(n).replace('-', '_')}": lambda _, num=n: torch.tensor(num)
+                                         for n in tree_constants}
+        except KeyError as e:
+            valid_constants = list(CONSTANTS)
+            raise KeyError(
+                "The available tree constants are: " + f"{', '.join(valid_constants[:-1])} or "f"{valid_constants[-1]}"
+                if len(valid_constants) > 1 else valid_constants[0])
 
 
     # setting up the configuration dictionaries based on the user given input
@@ -234,18 +234,46 @@ def gsgp(X_train: torch.Tensor, y_train: torch.Tensor, X_test: torch.Tensor = No
 
     #   *************** GSGP_SOLVE_PARAMETERS ***************
 
-    # setting up the information of the run, for logging purposes
-    gsgp_solve_parameters["run_info"] = [algo_name, unique_run_id, dataset_name]
     gsgp_solve_parameters["n_iter"] = n_iter
-    gsgp_solve_parameters["log_path"] = log_path
     gsgp_solve_parameters["elitism"] = elitism
     gsgp_solve_parameters["n_elites"] = n_elites
     gsgp_solve_parameters["n_jobs"] = n_jobs
     gsgp_solve_parameters["test_elite"] = test_elite
-    gsgp_solve_parameters["log"] = log_level
-    gsgp_solve_parameters["verbose"] = verbose
     gsgp_solve_parameters["reconstruct"] = reconstruct
     gsgp_solve_parameters["ffunction"] = fitness_function_options[fitness_function]
+
+    # ================================
+    #       Initialize MLflow Run
+    # ================================
+    
+    run_name = f"{algo_name}_{dataset_name}_seed{seed}_{unique_run_id}"
+    params = {
+        "algorithm": algo_name,
+        "dataset": dataset_name,
+        "seed": seed,
+        "pop_size": pop_size,
+        "n_iter": n_iter,
+        "p_xo": p_xo,
+        "elitism": elitism,
+        "n_elites": n_elites,
+        "init_depth": init_depth,
+        "ms_lower": ms_lower,
+        "ms_upper": ms_upper,
+        "fitness_function": fitness_function,
+        "initializer": initializer,
+        "prob_const": prob_const,
+        "reconstruct": reconstruct,
+        "tournament_size": tournament_size,
+        "test_elite": test_elite,
+        "n_jobs": n_jobs
+    }
+    
+    init_mlflow_run(
+        tracking_uri=mlflow_tracking_uri,
+        experiment_name=experiment_name,
+        run_name=run_name,
+        params=params
+    )
 
     # ================================
     #       Running the Algorithm
@@ -262,14 +290,15 @@ def gsgp(X_train: torch.Tensor, y_train: torch.Tensor, X_test: torch.Tensor = No
         **gsgp_solve_parameters,
     )
 
-    log_settings(
-        path=log_path[:-4] + "_settings.csv",
-        settings_dict=[gsgp_solve_parameters,
-                       gsgp_parameters,
-                       gsgp_pi_init,
-                       settings_dict],
-        unique_run_id=unique_run_id,
+    # Log final metrics
+    log_final_metrics(
+        best_train_fitness=float(optimizer.elite.fitness),
+        best_test_fitness=float(optimizer.elite.test_fitness) if test_elite else None
     )
+    
+    # End MLflow run
+    end_mlflow_run()
+
     return optimizer.elite
 
 

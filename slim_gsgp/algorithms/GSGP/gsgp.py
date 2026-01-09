@@ -33,9 +33,7 @@ from slim_gsgp.algorithms.GSGP.representations.population import Population
 from slim_gsgp.algorithms.GSGP.representations.tree import Tree
 from slim_gsgp.algorithms.GSGP.representations.tree_utils import (
     nested_depth_calculator, nested_nodes_calculator)
-from slim_gsgp.utils.diversity import gsgp_pop_div_from_vectors
-from slim_gsgp.utils.logger import logger
-from slim_gsgp.utils.utils import get_random_tree, verbose_reporter
+from slim_gsgp.utils.mlflow_logger import log_generation
 
 
 class GSGP:
@@ -118,11 +116,7 @@ class GSGP:
         curr_dataset,
         n_iter=20,
         elitism=True,
-        log=0,
-        verbose=0,
         test_elite=False,
-        log_path=None,
-        run_info=None,
         ffunction=None,
         reconstruct=False,
         n_elites=1,
@@ -147,18 +141,10 @@ class GSGP:
             Number of iterations.
         elitism : bool
             Whether to use elitism.
-        log : int
-            Logging level. Default is 0.
-        verbose : int
-            Verbosity level. Default is 0.
         test_elite : bool
             Whether to evaluate elite individuals on test data. Default is False.
-        log_path : str
-            Path to save logs. Default is None.
-        run_info : list
-            Information about the current run. Default is None.
-        ffunction : callable
-            Fitness function. Default is None.
+        ffunction : str
+            Fitness function name. Default is None.
         reconstruct : bool
             Whether to reconstruct trees. Default is False.
         n_elites : int
@@ -207,86 +193,15 @@ class GSGP:
         if test_elite:
             self.elite.evaluate(ffunction, y=y_test, testing=True)
 
-        # logging the intial results, if the result level is != 0
-        if log != 0:
-            if log == 2:
-                add_info = [
-                    self.elite.test_fitness,
-                    self.elite.nodes,
-                    gsgp_pop_div_from_vectors(
-                        torch.stack(
-                            [
-                                (
-                                    ind.train_semantics
-                                    if ind.train_semantics.shape != torch.Size([])
-                                    else ind.train_semantics.repeat(len(X_train))
-                                )
-                                for ind in population.population
-                            ]
-                        )
-                    ),
-                    np.std(population.fit),
-                    log,
-                ]
+        # Log generation 0 metrics to MLflow
+        log_generation(
+            generation=0,
+            best_train_fitness=float(self.elite.fitness),
+            best_test_fitness=float(self.elite.test_fitness) if test_elite else None,
+            best_n_nodes=self.elite.nodes,
+            fitness_function=ffunction
+        )
 
-            elif log == 3:
-
-                add_info = [
-                    self.elite.test_fitness,
-                    self.elite.nodes,
-                    " ".join([str(ind.nodes_count) for ind in population.population]),
-                    " ".join([str(f) for f in population.fit]),
-                    log,
-                ]
-
-            elif log == 4:
-
-                add_info = [
-                    self.elite.test_fitness,
-                    self.elite.nodes,
-                    gsgp_pop_div_from_vectors(
-                        torch.stack(
-                            [
-                                (
-                                    ind.train_semantics
-                                    if ind.train_semantics.shape != torch.Size([])
-                                    else ind.train_semantics.repeat(len(X_train))
-                                )
-                                for ind in population.population
-                            ]
-                        )
-                    ),
-                    np.std(population.fit),
-                    " ".join([str(ind.nodes) for ind in population.population]),
-                    " ".join([str(f) for f in population.fit]),
-                    log,
-                ]
-
-            else:
-
-                add_info = [self.elite.test_fitness, self.elite.nodes, log]
-
-            # logging the results
-            logger(
-                log_path,
-                0,
-                self.elite.fitness,
-                end - start,
-                float(population.nodes_count),
-                additional_infos=add_info,
-                run_info=run_info,
-                seed=self.seed,
-            )
-        # displaying the results on console, if applicable
-        if verbose != 0:
-            verbose_reporter(
-                curr_dataset,
-                0,
-                self.elite.fitness,
-                self.elite.test_fitness,
-                end - start,
-                self.elite.nodes,
-            )
         # EVOLUTIONARY PROCESS
         for it in range(1, n_iter + 1, 1):
             # creating the empty offpsring population
@@ -464,86 +379,12 @@ class GSGP:
             if test_elite:
                 self.elite.evaluate(ffunction, y=y_test, testing=True)
 
-            # logging the results if log !=0
-            if log != 0:
+            # Log generation metrics to MLflow
+            log_generation(
+                generation=it,
+                best_train_fitness=float(self.elite.fitness),
+                best_test_fitness=float(self.elite.test_fitness) if test_elite else None,
+                best_n_nodes=self.elite.nodes,
+                fitness_function=ffunction
+            )
 
-                if log == 2:
-                    add_info = [
-                        self.elite.test_fitness,
-                        self.elite.nodes,
-                        gsgp_pop_div_from_vectors(
-                            torch.stack(
-                                [
-                                    (
-                                        ind.train_semantics
-                                        if ind.train_semantics.shape != torch.Size([])
-                                        else ind.train_semantics.repeat(len(X_train))
-                                    )
-                                    for ind in population.population
-                                ]
-                            )
-                        ),
-                        np.std(population.fit),
-                        log,
-                    ]
-
-                elif log == 3:
-
-                    add_info = [
-                        self.elite.test_fitness,
-                        self.elite.nodes,
-                        " ".join(
-                            [str(ind.nodes_count) for ind in population.population]
-                        ),
-                        " ".join([str(f) for f in population.fit]),
-                        log,
-                    ]
-
-                elif log == 4:
-
-                    add_info = [
-                        self.elite.test_fitness,
-                        self.elite.nodes,
-                        gsgp_pop_div_from_vectors(
-                            torch.stack(
-                                [
-                                    (
-                                        ind.train_semantics
-                                        if ind.train_semantics.shape != torch.Size([])
-                                        else ind.train_semantics.repeat(len(X_train))
-                                    )
-                                    for ind in population.population
-                                ]
-                            )
-                        ),
-                        np.std(population.fit),
-                        " ".join([str(ind.nodes) for ind in population.population]),
-                        " ".join([str(f) for f in population.fit]),
-                        log,
-                    ]
-
-                else:
-
-                    add_info = [self.elite.test_fitness, self.elite.nodes, log]
-
-                # logging the results
-                logger(
-                    log_path,
-                    it,
-                    self.elite.fitness,
-                    end - start,
-                    float(population.nodes_count),
-                    additional_infos=add_info,
-                    run_info=run_info,
-                    seed=self.seed,
-                )
-            # displaying the results on console, if applicable
-            if verbose != 0:
-                verbose_reporter(
-                    run_info[-1],
-                    it,
-                    self.elite.fitness,
-                    self.elite.test_fitness,
-                    end - start,
-                    self.elite.nodes,
-                )
